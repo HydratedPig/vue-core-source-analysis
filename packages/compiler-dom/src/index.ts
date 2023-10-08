@@ -61,7 +61,7 @@ export function compile(
     })
   )
 }
-
+// SFC parse 入口，包括 parseFile
 export function parse(template: string, options: ParserOptions = {}): RootNode {
   return baseParse(template, extend({}, parserOptions, options))
 }

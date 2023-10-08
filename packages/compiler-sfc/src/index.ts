@@ -1,6 +1,7 @@
 export const version = __VERSION__
 
 // API
+// 由 vite 得，parse 是主要攻克对象
 export { parse, parseCache } from './parse'
 export { compileTemplate } from './compileTemplate'
 export { compileStyle, compileStyleAsync } from './compileStyle'

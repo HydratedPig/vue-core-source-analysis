@@ -551,7 +551,7 @@ export const locStub: SourceLocation = {
   start: { line: 1, column: 1, offset: 0 },
   end: { line: 1, column: 1, offset: 0 }
 }
-
+// 根节点就是个空的，没啥其他东西，type === NodeTypes.ROOT
 export function createRoot(
   children: TemplateChildNode[],
   loc = locStub

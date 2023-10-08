@@ -92,7 +92,7 @@ export interface SFCParseResult {
   descriptor: SFCDescriptor
   errors: (CompilerError | SyntaxError)[]
 }
-
+// 单例 cache，命中 cache 直接返回，以加快编译速度
 export const parseCache = createCache<SFCParseResult>()
 
 export function parse(
@@ -106,6 +106,7 @@ export function parse(
     compiler = CompilerDOM
   }: SFCParseOptions = {}
 ): SFCParseResult {
+  // 源码主键
   const sourceKey =
     source + sourceMap + filename + sourceRoot + pad + compiler.parse
   const cache = parseCache.get(sourceKey)
@@ -127,6 +128,8 @@ export function parse(
   }
 
   const errors: (CompilerError | SyntaxError)[] = []
+  // 编译器 parse 源码
+  // TODO: 区别于 SSR，SSR 用的是 baseParse，后续待填坑
   const ast = compiler.parse(source, {
     // there are no components at SFC parsing level
     isNativeTag: () => true,

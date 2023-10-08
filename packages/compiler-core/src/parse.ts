@@ -100,12 +100,14 @@ export interface ParserContext {
   inVPre: boolean // v-pre, do not process directives and interpolations
   onWarn: NonNullable<ErrorHandlingOptions['onWarn']>
 }
-
+// TODO: SSR 里 options 和这边不一样，传参不严格...
 export function baseParse(
   content: string,
   options: ParserOptions = {}
 ): RootNode {
+  // 创建 parser 上下文，后续都基于此
   const context = createParserContext(content, options)
+  // 生成光标起始点，重要概念 cursor/selection 后续 parser 都会基于此进行
   const start = getCursor(context)
   return createRoot(
     parseChildren(context, TextModes.DATA, []),
@@ -139,7 +141,7 @@ function createParserContext(
     onWarn: options.onWarn
   }
 }
-
+// parse children 这个一个有限状态机，不同运行到不同代码块时丢个不同的处理器去处理，context 会不断被消费，直到尽头
 function parseChildren(
   context: ParserContext,
   mode: TextModes,
@@ -156,15 +158,20 @@ function parseChildren(
 
     if (mode === TextModes.DATA || mode === TextModes.RCDATA) {
       if (!context.inVPre && startsWith(s, context.options.delimiters[0])) {
+        // v-pre 指令集处理时会遇见插值符，所以上下文不在 v-pre 指令那么就可以认为是插值，处理 '{{' 插值
+        // For Example: <input v-model="{x: '{{msg}}'}.x"> Here is not a delimiter.
         // '{{'
         node = parseInterpolation(context, mode)
       } else if (mode === TextModes.DATA && s[0] === '<') {
+        // 可能遇见标签了，开始处理
         // https://html.spec.whatwg.org/multipage/parsing.html#tag-open-state
         if (s.length === 1) {
+          // 非法标签，结束！
           emitError(context, ErrorCodes.EOF_BEFORE_TAG_NAME, 1)
         } else if (s[1] === '!') {
           // https://html.spec.whatwg.org/multipage/parsing.html#markup-declaration-open-state
           if (startsWith(s, '<!--')) {
+            // <!-- comment -->
             node = parseComment(context)
           } else if (startsWith(s, '<!DOCTYPE')) {
             // Ignore DOCTYPE by a limitation.
@@ -181,6 +188,7 @@ function parseChildren(
             node = parseBogusComment(context)
           }
         } else if (s[1] === '/') {
+          // 如果是标签闭合符，那么肯定是有标签未正确关闭，报错~
           // https://html.spec.whatwg.org/multipage/parsing.html#end-tag-open-state
           if (s.length === 2) {
             emitError(context, ErrorCodes.EOF_BEFORE_TAG_NAME, 2)
@@ -227,6 +235,7 @@ function parseChildren(
             node = node.children
           }
         } else if (s[1] === '?') {
+          // "'<?' is allowed only in XML context."
           emitError(
             context,
             ErrorCodes.UNEXPECTED_QUESTION_MARK_INSTEAD_OF_TAG_NAME,
@@ -238,6 +247,7 @@ function parseChildren(
         }
       }
     }
+    // 未命中任意逻辑(node === undefined)，快进到下一个标签/插值符处，中间所有字符全部算作是 Text
     if (!node) {
       node = parseText(context, mode)
     }
@@ -1141,7 +1151,7 @@ function emitError(
     })
   )
 }
-
+// 判断 parse 终止条件
 function isEnd(
   context: ParserContext,
   mode: TextModes,
@@ -1151,9 +1161,11 @@ function isEnd(
 
   switch (mode) {
     case TextModes.DATA:
+      // 如果 source 是标签关闭符号，就判断
       if (startsWith(s, '</')) {
         // TODO: probably bad performance
         for (let i = ancestors.length - 1; i >= 0; --i) {
+          // 所有祖先节点都判断下，因为祖先节点可能存在进去 parse 了但是还没出来的情况，如果对应某一个祖先的关闭标签，那么这一层祖先循环结束
           if (startsWithEndTagOpen(s, ancestors[i].tag)) {
             return true
           }
