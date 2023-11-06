@@ -171,7 +171,7 @@ function parseChildren(
         } else if (s[1] === '!') {
           // https://html.spec.whatwg.org/multipage/parsing.html#markup-declaration-open-state
           if (startsWith(s, '<!--')) {
-            // <!-- comment -->
+            // <!-- 解析 comment -->
             node = parseComment(context)
           } else if (startsWith(s, '<!DOCTYPE')) {
             // Ignore DOCTYPE by a limitation.
@@ -188,19 +188,24 @@ function parseChildren(
             node = parseBogusComment(context)
           }
         } else if (s[1] === '/') {
-          // 如果是标签闭合符，那么肯定是有标签未正确关闭，报错~
           // https://html.spec.whatwg.org/multipage/parsing.html#end-tag-open-state
           if (s.length === 2) {
+            // </ 不是合法标签
             emitError(context, ErrorCodes.EOF_BEFORE_TAG_NAME, 2)
           } else if (s[2] === '>') {
+            // </> 不是合法标签，少了标签名 missing end tag name
             emitError(context, ErrorCodes.MISSING_END_TAG_NAME, 2)
+            // 前进 3 个字符/ advance 3 chars
             advanceBy(context, 3)
             continue
           } else if (/[a-z]/i.test(s[2])) {
+            // 不正确的结束标签/Invalid End Tag
             emitError(context, ErrorCodes.X_INVALID_END_TAG)
+            // 把这个不正确的结束标签消费掉，继续向下 parse 以获取更多的信息/consume this invalid end tag, and anvanced for more info in codes
             parseTag(context, TagType.End, parent)
             continue
           } else {
+            // 标签名不合法/invalid tag name
             emitError(
               context,
               ErrorCodes.INVALID_FIRST_CHARACTER_OF_TAG_NAME,
@@ -209,6 +214,7 @@ function parseChildren(
             node = parseBogusComment(context)
           }
         } else if (/[a-z]/i.test(s[1])) {
+          // 发现这是一个标签，开始正常消费/consume it for that it is a common starting tag.
           node = parseElement(context, ancestors)
 
           // 2.x <template> with no directive compat
@@ -548,10 +554,13 @@ function parseTag(
   // Tag open.
   const start = getCursor(context)
   const match = /^<\/?([a-z][^\t\r\n\f />]*)/i.exec(context.source)!
+  // get Tag name by $0;
   const tag = match[1]
+  // get tag's namespace, default is Namespaces.HTML
   const ns = context.options.getNamespace(tag, parent)
-
+  // 前进~~~跨越标签名 `<div class="class1">test</div>` => ` class="class1">test</div>`
   advanceBy(context, match[0].length)
+  // 跨越空字符/skip space codes ` class="class1">test</div>` => `class="class1">test</div>`
   advanceSpaces(context)
 
   // save current state in case we need to re-parse attributes with v-pre
@@ -563,6 +572,7 @@ function parseTag(
     context.inPre = true
   }
 
+  // get all props from source `class="class1">test</div>` => props equals to ({class: 'class1'})
   // Attributes.
   let props = parseAttributes(context, type)
 
@@ -723,17 +733,21 @@ function parseAttributes(
 ): (AttributeNode | DirectiveNode)[] {
   const props = []
   const attributeNames = new Set<string>()
+  // 又是一个有限状态机/Finite State Machine, consume all props
+  // 如果是起始标签的结束符 '>' / '/>' 或者 source 消费完了就退出状态机/consume until the end of the starting tag's flag or all of the source are used
   while (
     context.source.length > 0 &&
     !startsWith(context.source, '>') &&
     !startsWith(context.source, '/>')
   ) {
     if (startsWith(context.source, '/')) {
+      // 四不像，到了 '/' 符号，但是不是 '/>' 报错，并继续向下消费
       emitError(context, ErrorCodes.UNEXPECTED_SOLIDUS_IN_TAG)
       advanceBy(context, 1)
       advanceSpaces(context)
       continue
     }
+    // 结束标签没有 props / there are not any attributes in the end tag, throw error
     if (type === TagType.End) {
       emitError(context, ErrorCodes.END_TAG_WITH_ATTRIBUTES)
     }
