@@ -199,7 +199,8 @@ function parseChildren(
             advanceBy(context, 3)
             continue
           } else if (/[a-z]/i.test(s[2])) {
-            // 不正确的结束标签/Invalid End Tag
+            // 因为 while 那边已经判断了是否是结束标签，如果是正确闭合的结束标签会被正常消费掉，不正确的结束标签会报下面这个错/Invalid End Tag
+            // `<span></aspan>` -> `ErrorCodes.X_INVALID_END_TAG`
             emitError(context, ErrorCodes.X_INVALID_END_TAG)
             // 把这个不正确的结束标签消费掉，继续向下 parse 以获取更多的信息/consume this invalid end tag, and anvanced for more info in codes
             parseTag(context, TagType.End, parent)
@@ -270,11 +271,13 @@ function parseChildren(
   // Whitespace handling strategy like v2
   let removedWhitespace = false
   if (mode !== TextModes.RAWTEXT && mode !== TextModes.RCDATA) {
+    // HP: condense useless whitespace
     const shouldCondense = context.options.whitespace !== 'preserve'
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i]
       if (node.type === NodeTypes.TEXT) {
         if (!context.inPre) {
+          // 空行处理 直接干掉或者替换成 ` `
           if (!/[^\t\r\n\f ]/.test(node.content)) {
             const prev = nodes[i - 1]
             const next = nodes[i + 1]
@@ -449,10 +452,14 @@ function parseElement(
   const wasInPre = context.inPre
   const wasInVPre = context.inVPre
   const parent = last(ancestors)
+  // consume context for element and its props
   const element = parseTag(context, TagType.Start, parent)
+  // 确定 pre 边界
   const isPreBoundary = context.inPre && !wasInPre
+  // 确定 vpre 边界
   const isVPreBoundary = context.inVPre && !wasInVPre
 
+  // 自闭合标签关闭边界
   if (element.isSelfClosing || context.options.isVoidTag(element.tag)) {
     // #4030 self-closing <pre> tag
     if (isPreBoundary) {
@@ -577,6 +584,7 @@ function parseTag(
   let props = parseAttributes(context, type)
 
   // check v-pre
+  // v-pre will reset context and reparse attributes
   if (
     type === TagType.Start &&
     !context.inVPre &&
@@ -599,6 +607,7 @@ function parseTag(
     if (type === TagType.End && isSelfClosing) {
       emitError(context, ErrorCodes.END_TAG_WITH_TRAILING_SOLIDUS)
     }
+    // "/>" need advance 2 chars and ">" need advance 1 char
     advanceBy(context, isSelfClosing ? 2 : 1)
   }
 
@@ -674,6 +683,7 @@ function isComponent(
   context: ParserContext
 ) {
   const options = context.options
+  // HP: for webcomponent
   if (options.isCustomElement(tag)) {
     return false
   }
@@ -756,6 +766,7 @@ function parseAttributes(
 
     // Trim whitespace between class
     // https://github.com/vuejs/core/issues/4251
+    // Q: but why didn't you trim whitespace between className?
     if (
       attr.type === NodeTypes.ATTRIBUTE &&
       attr.value &&
@@ -775,7 +786,10 @@ function parseAttributes(
   }
   return props
 }
-
+// 获取属性，语法树上，如果是 directives 那么 name 为对应的 directiveName 具体属性的参数存储在 arg 里 value 就是那个 value
+// 同时 type 也会区分 DIRECTIVE 还是 ATTRIBUTE
+// in syntax tree, if type is DIRECTIVE, the name will be set with the directiveName, and the arguments of attributes will
+// be stored in the "arg".
 function parseAttribute(
   context: ParserContext,
   nameSet: Set<string>
@@ -784,18 +798,23 @@ function parseAttribute(
 
   // Name.
   const start = getCursor(context)
+  // get attribute: match[0] is attr
   const match = /^[^\t\r\n\f />][^\t\r\n\f />=]*/.exec(context.source)!
   const name = match[0]
 
+  // warning duplicate attribute but allow user use this action
   if (nameSet.has(name)) {
     emitError(context, ErrorCodes.DUPLICATE_ATTRIBUTE)
   }
   nameSet.add(name)
 
+  // if the parsed attr is starting with '=' warning the coder
   if (name[0] === '=') {
     emitError(context, ErrorCodes.UNEXPECTED_EQUALS_SIGN_BEFORE_ATTRIBUTE_NAME)
   }
   {
+    // 测算属性还是否有不应该存在的字符，如果有报错，因为按照 attr="value" 形式解析出来的 attr 没有这些字符
+    // check any char existing with fault. If the attr has these character, it is a wrong expression.
     const pattern = /["'<]/g
     let m: RegExpExecArray | null
     while ((m = pattern.exec(name))) {
@@ -807,16 +826,21 @@ function parseAttribute(
     }
   }
 
+  // walk through attribute
   advanceBy(context, name.length)
 
   // Value
   let value: AttributeValue = undefined
 
+  // 有等号属性赋值的表达式处理
+  // 跳过属性表达式中间的字符 `  =   "value"` -> `"value"`
+  // skip the ignorance character in the expression of attribute
   if (/^[\t\r\n\f ]*=/.test(context.source)) {
     advanceSpaces(context)
     advanceBy(context, 1)
     advanceSpaces(context)
     value = parseAttributeValue(context)
+    // no value after "=" throw error and go forward
     if (!value) {
       emitError(context, ErrorCodes.MISSING_ATTRIBUTE_VALUE)
     }
@@ -824,12 +848,16 @@ function parseAttribute(
   const loc = getSelection(context, start)
 
   if (!context.inVPre && /^(v-[A-Za-z0-9-]|:|\.|@|#)/.test(name)) {
+    // Q: I know that "v-x" is v directives, ":" equals to "v-bind:", "@" equals to "v-on:" "#" equals "v-slot:".
+    // However what does "." mean?
+    // A: How does it('.') use in SSR and not used in SPC
     const match =
       /(?:^v-([a-z0-9-]+))?(?:(?::|^\.|^@|^#)(\[[^\]]+\]|[^\.]+))?(.+)?$/i.exec(
         name
       )!
 
     let isPropShorthand = startsWith(name, '.')
+    // get directives' name: "v-xxx" -> "xxx"
     let dirName =
       match[1] ||
       (isPropShorthand || startsWith(name, ':')
@@ -840,6 +868,7 @@ function parseAttribute(
     let arg: ExpressionNode | undefined
 
     if (match[2]) {
+      // Get Props Name
       const isSlot = dirName === 'slot'
       const startOffset = name.lastIndexOf(
         match[2],
@@ -858,6 +887,7 @@ function parseAttribute(
       let isStatic = true
 
       if (content.startsWith('[')) {
+        // content is dynamic arguments
         isStatic = false
 
         if (!content.endsWith(']')) {
@@ -873,6 +903,15 @@ function parseAttribute(
         // #1241 special case for v-slot: vuetify relies extensively on slot
         // names containing dots. v-slot doesn't have any modifiers and Vue 2.x
         // supports such usage so we are keeping it consistent with 2.x.
+
+        // PG:  EXAMPLE https://github.com/vuejs/core/issues/1241#issuecomment-634623717
+        /**
+         * /(?:^v-([a-z0-9-]+))?(?:(?::|^\.|^@|^#)(\[[^\]]+\]|[^\.]+))?(.+)?$/i.exec(
+         *   'v-slot:item.firstname.xxxx'
+         * )
+         *
+         * ['v-slot:item.firstname.xxxx', 'slot', 'item', '.firstname.xxxx', index: 0, input: 'v-slot:item.firstname.xxxx', groups: undefined]
+         *  */
         content += match[3] || ''
       }
 
@@ -900,6 +939,7 @@ function parseAttribute(
 
     // 2.x compat v-bind:foo.sync -> v-model:foo
     if (__COMPAT__ && dirName === 'bind' && arg) {
+      // 兼容 v2 中特殊的 v-model 逻辑
       if (
         modifiers.includes('sync') &&
         checkCompatEnabled(
@@ -940,6 +980,7 @@ function parseAttribute(
     }
   }
 
+  // 没有指令名称的报错
   // missing directive name or illegal directive name
   if (!context.inVPre && startsWith(name, 'v-')) {
     emitError(context, ErrorCodes.X_MISSING_DIRECTIVE_NAME)
@@ -961,6 +1002,7 @@ function parseAttributeValue(context: ParserContext): AttributeValue {
   const start = getCursor(context)
   let content: string
 
+  // get quote sign
   const quote = context.source[0]
   const isQuoted = quote === `"` || quote === `'`
   if (isQuoted) {
@@ -968,17 +1010,25 @@ function parseAttributeValue(context: ParserContext): AttributeValue {
     advanceBy(context, 1)
 
     const endIndex = context.source.indexOf(quote)
+    // TODO: HP 这里有个问题，属性值未闭合怎么处理？提示错误但是可以正确构建的兼容？
     if (endIndex === -1) {
+      // quote has not closed
       content = parseTextData(
         context,
         context.source.length,
         TextModes.ATTRIBUTE_VALUE
       )
     } else {
+      // parse value and advanced value text
       content = parseTextData(context, endIndex, TextModes.ATTRIBUTE_VALUE)
+      // skip the end of quote
       advanceBy(context, 1)
     }
   } else {
+    // Q: HP where did unquoted value be used?
+    // A: if unquoted, the expression will express as quoted
+    // `val=ss` -> `{val: 'ss'}`
+    // `const msg = ref('') <Comp :val=msg :val2=msg2 />` -> `const msg = ref(''); h(Comp, { val: msg.value, val2: _ctx.msg2})
     // Unquoted
     const match = /^[^\t\r\n\f >]+/.exec(context.source)
     if (!match) {
