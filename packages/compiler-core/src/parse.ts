@@ -150,7 +150,7 @@ function parseChildren(
   const parent = last(ancestors)
   const ns = parent ? parent.ns : Namespaces.HTML
   const nodes: TemplateChildNode[] = []
-
+  // 除了文件 root 在 source 消费完了才终止状态机外，其余发现是 ancestors 的
   while (!isEnd(context, mode, ancestors)) {
     __TEST__ && assert(context.source.length > 0)
     const s = context.source
@@ -270,6 +270,8 @@ function parseChildren(
 
   // Whitespace handling strategy like v2
   let removedWhitespace = false
+  // the tag name that does not equal to 'template' will be set as RAWTEXT in compiler-sfc
+  // /packages/compiler-sfc/src/parse.ts/parse/ast/getTextMode
   if (mode !== TextModes.RAWTEXT && mode !== TextModes.RCDATA) {
     // HP: condense useless whitespace
     const shouldCondense = context.options.whitespace !== 'preserve'
@@ -502,6 +504,7 @@ function parseElement(
   element.children = children
 
   // End tag.
+  // consume end tag
   if (startsWithEndTagOpen(context.source, element.tag)) {
     parseTag(context, TagType.End, parent)
   } else {
@@ -1095,7 +1098,7 @@ function parseInterpolation(
 
 function parseText(context: ParserContext, mode: TextModes): TextNode {
   __TEST__ && assert(context.source.length > 0)
-
+  // find next element or delimiter as text end token
   const endTokens =
     mode === TextModes.CDATA ? [']]>'] : ['<', context.options.delimiters[0]]
 
