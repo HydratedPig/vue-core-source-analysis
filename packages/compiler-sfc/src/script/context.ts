@@ -81,6 +81,7 @@ export class ScriptCompileContext {
     public options: Partial<SFCScriptCompileOptions>
   ) {
     const { script, scriptSetup } = descriptor
+    // confirm script language for parser
     const scriptLang = script && script.lang
     const scriptSetupLang = scriptSetup && scriptSetup.lang
 
@@ -158,12 +159,15 @@ export function resolveParserPlugins(
   if (lang === 'jsx' || lang === 'tsx') {
     plugins.push('jsx')
   } else if (userPlugins) {
+    // 防止用户在 js 里写 jsx 可还行哦，react 为啥就可以.jpg
     // If don't match the case of adding jsx
     // should remove the jsx from user options
     userPlugins = userPlugins.filter(p => p !== 'jsx')
   }
   if (lang === 'ts' || lang === 'tsx') {
     plugins.push(['typescript', { dts }])
+    // TODO: maybe it is userPlugins?
+    // yes it has been fixed today
     if (!plugins.includes('decorators')) {
       plugins.push('decorators-legacy')
     }
@@ -171,5 +175,6 @@ export function resolveParserPlugins(
   if (userPlugins) {
     plugins.push(...userPlugins)
   }
+  // if tsx -> ['jsx', 'typescript', 'decorators-legacy']
   return plugins
 }
