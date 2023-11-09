@@ -161,6 +161,7 @@ export function parse(
     }
   })
   ast.children.forEach(node => {
+    // 根节点仅取 ELEMENT 的数据，其他数据非 template 定义的逻辑全部丢弃
     if (node.type !== NodeTypes.ELEMENT) {
       return
     }
@@ -175,6 +176,7 @@ export function parse(
     }
     switch (node.tag) {
       case 'template':
+        // if there are multiple template blocks throw "createDuplicateBlockError"
         if (!descriptor.template) {
           const templateBlock = (descriptor.template = createBlock(
             node,
@@ -268,6 +270,7 @@ export function parse(
         )
       }
     }
+    // add source map into blocks
     genMap(descriptor.template)
     genMap(descriptor.script)
     descriptor.styles.forEach(genMap)
@@ -279,6 +282,7 @@ export function parse(
 
   // check if the SFC uses :slotted
   const slottedRE = /(?:::v-|:)slotted\(/
+  // :slotted() will be used to explicitly target slot content.
   descriptor.slotted = descriptor.styles.some(
     s => s.scoped && slottedRE.test(s.content)
   )
@@ -344,12 +348,14 @@ function createBlock(
   }
   node.props.forEach(p => {
     if (p.type === NodeTypes.ATTRIBUTE) {
+      // attrs 赋初值 为 true 空字符串也认为是 true, 仅针对顶层
       attrs[p.name] = p.value ? p.value.content || true : true
       if (p.name === 'lang') {
         block.lang = p.value && p.value.content
       } else if (p.name === 'src') {
         block.src = p.value && p.value.content
       } else if (type === 'style') {
+        // scoped 妹有 false 的值
         if (p.name === 'scoped') {
           ;(block as SFCStyleBlock).scoped = true
         } else if (p.name === 'module') {

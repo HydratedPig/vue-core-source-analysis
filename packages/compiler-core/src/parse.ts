@@ -806,6 +806,7 @@ function parseAttribute(
   const name = match[0]
 
   // warning duplicate attribute but allow user use this action
+  // duplicate will not be treat on parseAttributes
   if (nameSet.has(name)) {
     emitError(context, ErrorCodes.DUPLICATE_ATTRIBUTE)
   }

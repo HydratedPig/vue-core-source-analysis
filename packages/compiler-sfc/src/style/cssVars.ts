@@ -56,10 +56,12 @@ export function parseCssVars(sfc: SFCDescriptor): string[] {
     // ignore v-bind() in comments, eg /* ... */
     // and // (Less, Sass and Stylus all support the use of // to comment)
     const content = style.content.replace(/\/\*([\s\S]*?)\*\/|\/\/.*/g, '')
+    // regexp will store lastIndex in itself, and use the lastIndex when global is set as true
     while ((match = vBindRE.exec(content))) {
       const start = match.index + match[0].length
       const end = lexBinding(content, start)
       if (end !== null) {
+        // trim " and '
         const variable = normalizeExpression(content.slice(start, end))
         if (!vars.includes(variable)) {
           vars.push(variable)
