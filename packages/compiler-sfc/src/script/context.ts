@@ -104,6 +104,7 @@ export class ScriptCompileContext {
 
     function parse(input: string, offset: number): Program {
       try {
+        // use babel parse to parse script
         return babelParse(input, {
           plugins,
           sourceType: 'module'

@@ -57,6 +57,7 @@ function analyzeBindingsFromOptions(node: ObjectExpression): BindingMetadata {
       }
 
       // computed & methods
+      // computed & methods must be ObjectExpression, computed key will be passed
       else if (
         property.value.type === 'ObjectExpression' &&
         (property.key.name === 'computed' || property.key.name === 'methods')
@@ -81,6 +82,7 @@ function analyzeBindingsFromOptions(node: ObjectExpression): BindingMetadata {
         //     foo: null
         //   }
         // }
+        // if setup returns function it will be skipped;
         if (
           bodyItem.type === 'ReturnStatement' &&
           bodyItem.argument &&
@@ -105,6 +107,7 @@ function getObjectExpressionKeys(node: ObjectExpression): string[] {
   for (const prop of node.properties) {
     if (prop.type === 'SpreadElement') continue
     const key = resolveObjectKey(prop.key, prop.computed)
+    // only identifier /numeric/stringLiteral will be parsed
     if (key) keys.push(String(key))
   }
   return keys

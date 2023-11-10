@@ -29,6 +29,7 @@ export function rewriteDefaultAST(
   as: string
 ): void {
   if (!hasDefaultExport(ast)) {
+    // to avoid
     s.append(`\nconst ${as} = {}`)
     return
   }
@@ -38,6 +39,7 @@ export function rewriteDefaultAST(
   ast.forEach(node => {
     if (node.type === 'ExportDefaultDeclaration') {
       if (node.declaration.type === 'ClassDeclaration' && node.declaration.id) {
+        // TODO: HP it may remove decorators with error
         let start: number =
           node.declaration.decorators && node.declaration.decorators.length > 0
             ? node.declaration.decorators[
@@ -49,14 +51,24 @@ export function rewriteDefaultAST(
       } else {
         s.overwrite(node.start!, node.declaration.start!, `const ${as} = `)
       }
+      // process exportNamedDeclaration
     } else if (node.type === 'ExportNamedDeclaration') {
+      // only export xx from 'x' has sepcifiers or export { xx as default }
       for (const specifier of node.specifiers) {
         if (
           specifier.type === 'ExportSpecifier' &&
           specifier.exported.type === 'Identifier' &&
+          // export default from 'vue';
+          // export { default } from 'vue';
+          // export { constant as default } from 'vue';
+          // export { constant as default }
           specifier.exported.name === 'default'
         ) {
+          // export default from 'vue';
+          // export { default } from 'vue';
+          // export { constant as default } from 'vue';
           if (node.source) {
+            // export { default } from 'vue';
             if (specifier.local.name === 'default') {
               s.prepend(
                 `import { default as __VUE_DEFAULT__ } from '${node.source.value}'\n`
@@ -65,6 +77,8 @@ export function rewriteDefaultAST(
               s.remove(specifier.start!, end)
               s.append(`\nconst ${as} = __VUE_DEFAULT__`)
               continue
+              // export default from 'vue';
+              // export { constant as default } from 'vue';
             } else {
               s.prepend(
                 `import { ${s.slice(
@@ -79,6 +93,7 @@ export function rewriteDefaultAST(
             }
           }
 
+          // export { xx as default }
           const end = specifierEnd(s, specifier.end!, node.end!)
           s.remove(specifier.start!, end)
           s.append(`\nconst ${as} = ${specifier.local.name}`)

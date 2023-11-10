@@ -21,6 +21,7 @@ export function processNormalScript(
     let content = script.content
     let map = script.map
     const scriptAst = ctx.scriptAst!
+    // fetch bindings from source code
     const bindings = analyzeScriptBindings(scriptAst.body)
     const { source, filename, cssVars } = ctx.descriptor
     const { sourceMap, genDefaultAs, isProd } = ctx.options
@@ -50,9 +51,17 @@ export function processNormalScript(
       }
     }
 
+    // cssVars are splitted from v-bind(s)?\(.*\)
     if (cssVars.length || genDefaultAs) {
       const defaultVar = genDefaultAs || normalScriptDefaultVar
       const s = new MagicString(content)
+      // magic-string will prune all default export like
+      // export default from 'vue';
+      // export { default } from 'vue';
+      // export { constant as default } from 'vue';
+      // export { constant as default };
+      // export default constant
+      // decorator class will be process in another way with a bit bug?
       rewriteDefaultAST(scriptAst.body, s, defaultVar)
       content = s.toString()
       if (cssVars.length) {

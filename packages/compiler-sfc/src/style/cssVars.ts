@@ -188,6 +188,7 @@ export function genNormalScriptCssVarsCode(
   isProd: boolean,
   defaultVar: string
 ): string {
+  // 这就不涉及语法树了，string 层面的添加
   return (
     `\nimport { ${CSS_VARS_HELPER} as _${CSS_VARS_HELPER} } from 'vue'\n` +
     `const __injectCSSVars__ = () => {\n${genCssVarsCode(

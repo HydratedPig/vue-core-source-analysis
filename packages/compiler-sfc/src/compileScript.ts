@@ -165,10 +165,13 @@ export function compileScript(
   const scriptLang = script && script.lang
   const scriptSetupLang = scriptSetup && scriptSetup.lang
 
+  // related to vue macros will be removed in v3.4.x
   // TODO remove in 3.4
   const enableReactivityTransform = !!options.reactivityTransform
   let refBindings: string[] | undefined
 
+  // if there are script and script setup in template, scriptsetup has high priority
+  // eventhough the compiler has check duplicate script in sfc-parser
   if (!scriptSetup) {
     if (!script) {
       throw new Error(`[@vue/compiler-sfc] SFC contains no <script> tags.`)
