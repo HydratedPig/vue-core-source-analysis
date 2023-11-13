@@ -244,9 +244,10 @@ export function compileScript(
       !sfc.template.src &&
       !sfc.template.lang
     ) {
+      // traverse all node's props in template to check if imported value is used
       isUsedInTemplate = isImportUsed(local, sfc)
     }
-
+    // register which imported valued is used in template
     ctx.userImports[local] = {
       isType,
       imported,
@@ -328,6 +329,8 @@ export function compileScript(
         const imported = getImportedName(specifier)
         const source = node.source.value
         const existing = ctx.userImports[local]
+        // in setup scripts, defineProps/defineEmits/defineExpose is setting as compiler macros and user needn't to import them anymore.
+        // as a precondition, all of them are imported from 'vue'
         if (
           source === 'vue' &&
           (imported === DEFINE_PROPS ||
@@ -339,10 +342,12 @@ export function compileScript(
           )
           removeSpecifier(i)
         } else if (existing) {
+          // dedupe duplicate specifier
           if (existing.source === source && existing.imported === imported) {
             // already imported in <script setup>, dedupe
             removeSpecifier(i)
           } else {
+            // avoid same local name
             ctx.error(
               `different imports aliased to same local name.`,
               specifier
@@ -361,6 +366,7 @@ export function compileScript(
           )
         }
       }
+      // TODO: HP not important source code, i cannot get it
       if (node.specifiers.length && removed === node.specifiers.length) {
         ctx.s.remove(node.start! + startOffset, node.end! + startOffset)
       }

@@ -26,6 +26,10 @@ export function isImportUsed(local: string, sfc: SFCDescriptor): boolean {
 
 const templateUsageCheckCache = createCache<string>()
 
+/**
+ * 把所有变量全部都集合到一起用','区分开来
+ * get all props/interpolations from template and join them with ','
+ */
 function resolveTemplateUsageCheckString(sfc: SFCDescriptor) {
   const { content, ast } = sfc.template!
   const cached = templateUsageCheckCache.get(content)
