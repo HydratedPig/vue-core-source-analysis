@@ -1044,6 +1044,9 @@ export function compileScript(
   }
 
   ctx.s.trim()
+  // TODO: HP it has a bit of strange, why didn't EvanYou insert refs into setup? The setup of defineComponent is very simple
+  // only __expose and _useCssVars in it. I cannot get it. Maybe I need more infomation about vue parser.
+  // Go ahead, forget this for a moment until I get the reasons
 
   return {
     ...scriptSetup,
