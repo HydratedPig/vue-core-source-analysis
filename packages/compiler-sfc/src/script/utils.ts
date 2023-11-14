@@ -33,6 +33,8 @@ export function isLiteralNode(node: Node) {
 }
 
 export function unwrapTSNode(node: Node): Node {
+  // pick javascript expression from typescript expression
+  // foo as number -> foo
   if (TS_NODE_TYPES.includes(node.type)) {
     return unwrapTSNode((node as any).expression)
   } else {

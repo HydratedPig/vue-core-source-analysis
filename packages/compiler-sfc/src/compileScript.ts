@@ -380,6 +380,7 @@ export function compileScript(
     if (source === 'vue') vueImportAliases[imported] = local
   }
 
+  // 和 rewriteDefaultAST 类似逻辑，不过没明白为啥要拆成两个用
   // 2.1 process normal <script> body
   if (script && scriptAst) {
     for (const node of scriptAst.body) {
@@ -514,9 +515,11 @@ export function compileScript(
 
   // 2.2 process <script setup> body
   for (const node of scriptSetupAst.body) {
+    // defineProps({})
     if (node.type === 'ExpressionStatement') {
       const expr = unwrapTSNode(node.expression)
       // process `defineProps` and `defineEmit(s)` calls
+      // remove duplicate calls
       if (
         processDefineProps(ctx, expr) ||
         processDefineEmits(ctx, expr) ||
@@ -537,6 +540,7 @@ export function compileScript(
       }
     }
 
+    // const props = definedProps({})
     if (node.type === 'VariableDeclaration' && !node.declare) {
       const total = node.declarations.length
       let left = total
@@ -1068,6 +1072,7 @@ function registerBinding(
   bindings[node.name] = type
 }
 
+// store bindings
 function walkDeclaration(
   from: 'script' | 'scriptSetup',
   node: Declaration,
@@ -1079,6 +1084,7 @@ function walkDeclaration(
 
   if (node.type === 'VariableDeclaration') {
     const isConst = node.kind === 'const'
+    // 判断声明是否是字面量，如果是函数调用的变量则 isAllLiteral 置位 false
     isAllLiteral =
       isConst &&
       node.declarations.every(
@@ -1087,6 +1093,7 @@ function walkDeclaration(
 
     // export const foo = ...
     for (const { id, init: _init } of node.declarations) {
+      // get pure js expression from ts expression
       const init = _init && unwrapTSNode(_init)
       const isDefineCall = !!(
         isConst &&
