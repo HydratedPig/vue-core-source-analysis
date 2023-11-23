@@ -49,6 +49,7 @@ export const transformIf = createStructuralDirectiveTransform(
       const siblings = context.parent!.children
       let i = siblings.indexOf(ifNode)
       let key = 0
+      // statistic the count of if branch, but i am not know what will it be used
       while (i-- >= 0) {
         const sibling = siblings[i]
         if (sibling && sibling.type === NodeTypes.IF) {
@@ -59,6 +60,7 @@ export const transformIf = createStructuralDirectiveTransform(
       // Exit callback. Complete the codegenNode when all children have been
       // transformed.
       return () => {
+        // isRoot means codegen is processing the v-if node instead of v-else/v-else-if node
         if (isRoot) {
           ifNode.codegenNode = createCodegenNodeForBranch(
             branch,
@@ -90,6 +92,9 @@ export function processIf(
     isRoot: boolean
   ) => (() => void) | undefined
 ) {
+  // 所有指令在 ast 中都是 { type: NodeTypes.DIRECTIVE, name: string, exp?: { type: NodeTypes.SIMPLE_EXPRESSION, content: string ...} }
+  // v-else 没有 expression 所以直接跳过，但是 v-if/v-else-if 必须要有 exp.content, 如果没有 content 则证明这个表达式不完整，有危险
+  // 为了代码健壮性，默认表达式初值为 true 即永远也走不到其他分支去了（createSimpleExpression）
   if (
     dir.name !== 'else' &&
     (!dir.exp || !(dir.exp as SimpleExpressionNode).content.trim())
@@ -101,6 +106,7 @@ export function processIf(
     dir.exp = createSimpleExpression(`true`, false, loc)
   }
 
+  // TODO: prefixIdentifiers 目前未知是干啥的，有点不明觉厉 {{ foo }} -> _ctx.foo，不过在 vite 调用 compile 中为 true
   if (!__BROWSER__ && context.prefixIdentifiers && dir.exp) {
     // dir.exp can only be simple expression because vIf transform is applied
     // before expression transform.
@@ -111,6 +117,7 @@ export function processIf(
     validateBrowserExpression(dir.exp as SimpleExpressionNode, context)
   }
 
+  // create if branch and replace old node with ifNode
   if (dir.name === 'if') {
     const branch = createIfBranch(node, dir)
     const ifNode: IfNode = {
@@ -129,12 +136,13 @@ export function processIf(
     let i = siblings.indexOf(node)
     while (i-- >= -1) {
       const sibling = siblings[i]
+      // remove any comment didnot make v-else/v-else-if have no adjacent if
       if (sibling && sibling.type === NodeTypes.COMMENT) {
         context.removeNode(sibling)
         __DEV__ && comments.unshift(sibling)
         continue
       }
-
+      // remove any whitespace text
       if (
         sibling &&
         sibling.type === NodeTypes.TEXT &&
@@ -146,6 +154,7 @@ export function processIf(
 
       if (sibling && sibling.type === NodeTypes.IF) {
         // Check if v-else was followed by v-else-if
+        // the reason why  v-else-if check is placed after v-else by using branch.condition is that the ifbranch is a stateless node
         if (
           dir.name === 'else-if' &&
           sibling.branches[sibling.branches.length - 1].condition === undefined
@@ -199,6 +208,7 @@ export function processIf(
         // node has been removed.
         context.currentNode = null
       } else {
+        // none of the node's type in the siblings are equal to NodeTypes.IF
         context.onError(
           createCompilerError(ErrorCodes.X_V_ELSE_NO_ADJACENT_IF, node.loc)
         )
@@ -214,12 +224,13 @@ function createIfBranch(node: ElementNode, dir: DirectiveNode): IfBranchNode {
     type: NodeTypes.IF_BRANCH,
     loc: node.loc,
     condition: dir.name === 'else' ? undefined : dir.exp,
+    // to avoid process children against with v-for
     children: isTemplateIf && !findDir(node, 'for') ? node.children : [node],
     userKey: findProp(node, `key`),
     isTemplateIf
   }
 }
-
+// 简单略过，生成代码用的，目前意义还没探究清楚
 function createCodegenNodeForBranch(
   branch: IfBranchNode,
   keyIndex: number,

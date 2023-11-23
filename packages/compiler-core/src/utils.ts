@@ -243,7 +243,7 @@ export function assert(condition: boolean, msg?: string) {
     throw new Error(msg || `unexpected compiler condition`)
   }
 }
-
+// this function is used solely to find any directive in props named "name"
 export function findDir(
   node: ElementNode,
   name: string | RegExp,
@@ -251,6 +251,7 @@ export function findDir(
 ): DirectiveNode | undefined {
   for (let i = 0; i < node.props.length; i++) {
     const p = node.props[i]
+    // only target to directives
     if (
       p.type === NodeTypes.DIRECTIVE &&
       (allowEmpty || p.exp) &&
@@ -260,7 +261,7 @@ export function findDir(
     }
   }
 }
-
+// this function is used solely to find any attributes in props named "name"
 export function findProp(
   node: ElementNode,
   name: string,
@@ -347,6 +348,7 @@ function getUnnormalizedProps(
   }
   return [props, callPath]
 }
+// 简单略过，这个就是给组件强行塞个 props 的，如果用户定义了，就按用户的 props 来，如果没定义，就塞入 vue 自己的 props
 export function injectProp(
   node: VNodeCall | RenderSlotCall,
   prop: Property,

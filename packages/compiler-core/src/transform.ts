@@ -242,6 +242,7 @@ export function createTransformContext(
       if (__DEV__ && removalIndex < 0) {
         throw new Error(`node being removed is not a child of current parent`)
       }
+      // if a node was removed from children, childIndex need to execute a self-decrement
       if (!node || node === context.currentNode) {
         // current node removed
         context.currentNode = null
@@ -400,6 +401,7 @@ export function traverseChildren(
     const child = parent.children[i]
     if (isString(child)) continue
     context.parent = parent
+    // the processing idx for context methods
     context.childIndex = i
     context.onNodeRemoved = nodeRemoved
     traverseNode(child, context)
@@ -412,6 +414,7 @@ export function traverseNode(
 ) {
   context.currentNode = node
   // apply transform plugins
+  // this is a chain of responsibility, every node will be processed by nodeTransforms and end with its function of exit
   const { nodeTransforms } = context
   const exitFns = []
   for (let i = 0; i < nodeTransforms.length; i++) {
