@@ -498,6 +498,7 @@ export function createStructuralDirectiveTransform(
           props.splice(i, 1)
           i--
           const onExit = fn(node, prop, context)
+          // directive like v-else-if/v-else do not return onExit, because these directives have consume exit hook in themselves.
           if (onExit) exitFns.push(onExit)
         }
       }

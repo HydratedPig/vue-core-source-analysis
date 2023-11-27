@@ -248,6 +248,7 @@ export function processFor(
   context: TransformContext,
   processCodegen?: (forNode: ForNode) => (() => void) | undefined
 ) {
+  // if constomer write v-for but they don't write directives' expression, throw ErrorCodes.X_V_FOR_NO_EXPRESSION and its location
   if (!dir.exp) {
     context.onError(
       createCompilerError(ErrorCodes.X_V_FOR_NO_EXPRESSION, dir.loc)

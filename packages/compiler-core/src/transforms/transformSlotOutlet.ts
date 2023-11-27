@@ -59,25 +59,31 @@ export function processSlotOutlet(
   node: SlotOutletNode,
   context: TransformContext
 ): SlotOutletProcessResult {
+  // <slot></slot> defaultName is "default", if the node has prop named "name", it will replace "default" as new slotName
   let slotName: string | ExpressionNode = `"default"`
   let slotProps: PropsExpression | undefined = undefined
 
   const nonNameProps = []
+  // traverse props
   for (let i = 0; i < node.props.length; i++) {
     const p = node.props[i]
+    // this is a procedure that process static attribute named "name"
     if (p.type === NodeTypes.ATTRIBUTE) {
       if (p.value) {
         if (p.name === 'name') {
           slotName = JSON.stringify(p.value.content)
         } else {
+          // transfer non name props
           p.name = camelize(p.name)
           nonNameProps.push(p)
         }
       }
     } else {
+      // dynamic slot-name <slot :name="content"/>. However it does not be written in setup document.
       if (p.name === 'bind' && isStaticArgOf(p.arg, 'name')) {
         if (p.exp) slotName = p.exp
       } else {
+        // bind non Name props
         if (p.name === 'bind' && p.arg && isStaticExp(p.arg)) {
           p.arg.content = camelize(p.arg.content)
         }
