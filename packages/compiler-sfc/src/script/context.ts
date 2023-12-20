@@ -18,6 +18,20 @@ export class ScriptCompileContext {
 
   source = this.descriptor.source
   filename = this.descriptor.filename
+  /**
+   * simplify demo for process await
+   * var magicString = require("magic-string");
+   * const template = `<script setup lang="tsx">
+   * const vv = await await Promise.resolve(1)
+   * </script>
+   * `
+   * const s = new magicString(template);
+   * s.update(37, 37 + 5, 'awa');
+   * s.overwrite(37, 37 + 5, 'awaa');
+   * s.overwrite(43, 43 +5, 'kkk');
+   * console.log(s);
+   * console.log(s.toString()); // "<script setup lang=\"tsx\">\nconst vv = awaa kkk Promise.resolve(1)\n</script>\n"
+   */
   s = new MagicString(this.source)
   startOffset = this.descriptor.scriptSetup?.loc.start.offset
   endOffset = this.descriptor.scriptSetup?.loc.end.offset

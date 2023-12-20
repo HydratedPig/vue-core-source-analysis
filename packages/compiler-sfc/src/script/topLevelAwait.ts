@@ -51,6 +51,7 @@ export function processAwait(
     node.argument.end! + startOffset
   )
 
+  // if await processAwait
   const containsNestedAwait = /\bawait\b/.test(argumentStr)
 
   ctx.s.overwrite(
