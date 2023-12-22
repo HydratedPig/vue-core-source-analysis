@@ -485,6 +485,7 @@ export function createStructuralDirectiveTransform(
       const { props } = node
       // structural directive transforms are not concerned with slots
       // as they are handled separately in vSlot.ts
+      // slot 单独处理，至于咋单独处理的...for feature analysis
       if (node.tagType === ElementTypes.TEMPLATE && props.some(isVSlot)) {
         return
       }

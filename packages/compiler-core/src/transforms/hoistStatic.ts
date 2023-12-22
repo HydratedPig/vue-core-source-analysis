@@ -27,6 +27,7 @@ import {
   NORMALIZE_STYLE
 } from '../runtimeHelpers'
 
+// 常量提升到外部以减少不必要的计算，减小 vue diff 压力提高性能
 export function hoistStatic(root: RootNode, context: TransformContext) {
   walk(
     root,

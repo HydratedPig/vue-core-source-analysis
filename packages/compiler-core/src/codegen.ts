@@ -221,6 +221,7 @@ export function generate(
     ? createCodegenContext(ast, options)
     : context
   if (!__BROWSER__ && mode === 'module') {
+    // gen module helper imports from vue
     genModulePreamble(ast, preambleContext, genScopeId, isSetupInlined)
   } else {
     genFunctionPreamble(ast, preambleContext)
